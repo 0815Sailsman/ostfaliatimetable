@@ -17,11 +17,13 @@ class User:
     def __init__(self):
         self.dirpath = os.path.expanduser('~/.oftt')
         self.cfgpath = os.path.expanduser('~/.oftt/config.json')
+        self.lectures = list()
 
         if self.exists_user():
             self.load()
         else:
             self.register()
+        print(self.lectures)
 
     def exists_user(self):
         if not self.files_exist():
@@ -52,12 +54,18 @@ class User:
             return False
         return True
 
+    def load(self):
+        f = open(self.cfgpath, 'r')
+        self.lectures = json.load(f)['lectures']
+
     def register(self):
         data = dict()
         data['auth'] = self.get_login_data()
-        print(data['auth'])
         data['lectures'] = self.get_lecture_data(data['auth'])
-
+        json_object = json.dumps(data, indent = 4)
+        with open(self.cfgpath, 'w') as cfg:
+            cfg.write(json_object)
+        self.lectures = data['lectures']
 
 
     def get_login_data(self):
@@ -66,7 +74,6 @@ class User:
 
         username = input('username (idxxxxxx): ')
         password = getpass.getpass()
-        print(bytes(username + ":" + password, 'utf-8'))
         return 'Basic ' + str(base64.b64encode(bytes(username + ':' + password, 'utf-8')))[2:-1]
 
     def get_lecture_data(self, auth):
@@ -75,10 +82,16 @@ class User:
 
         files = glob.glob(self.dirpath+'/*.csv')
         files.sort()
-        file = self.select(files)
+        while True:
+            file = self.select(files)
+            results = self.select(self.compile_subjects(file), multiple=True)
+            for l in range(len(results)):
+                lectures.append(file.split('.oftt/')[1][:-4] + "|" + results[l])
+            print("Do you want to add more lectures?")
+            if self.select(["yes", "no"]) == "no":
+                break
+        return lectures
 
-        lectures = self.select(self.compile_subjects(file), multiple=True)
-        print(lectures)
 
     def compile_subjects(self, file):
         with open(file, 'r') as csvfile:
